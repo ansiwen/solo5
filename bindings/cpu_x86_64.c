@@ -178,6 +178,22 @@ void cpu_trap_handler(uint64_t num, struct trap_regs *regs)
         (unsigned long long)regs->rsp, (unsigned long long)regs->rflags);
     if (num == 14)
         log(INFO, "Solo5: trap: cr2=0x%llx\n", (unsigned long long)regs->cr2);
+    if (num == 16) { // #MF
+        // Read the x87 status word to extract the error code
+        unsigned short x87_status_word;
+        __asm__ __volatile__("fnstsw %0" : "=m"(x87_status_word));
+
+        // Print out the error code
+        log(INFO, "#MF Exception: Error Code: 0x%04x\n", x87_status_word);
+
+        // Decode and print the error flags
+        if (x87_status_word & 0x0001) log(INFO, "Invalid operation\n");
+        if (x87_status_word & 0x0002) log(INFO, "Denormalized operand\n");
+        if (x87_status_word & 0x0004) log(INFO, "Zero divide\n");
+        if (x87_status_word & 0x0008) log(INFO, "Overflow\n");
+        if (x87_status_word & 0x0010) log(INFO, "Underflow\n");
+        if (x87_status_word & 0x0020) log(INFO, "Precision\n");
+    }
     PANIC("Fatal trap", regs);
 }
 

@@ -40,6 +40,17 @@ void _start(void *arg)
     log(INFO, "____/\\___/ _|\\___/____/\n");
     log(INFO, "Solo5: Bindings version %s\n", SOLO5_VERSION);
 
+    unsigned short control_word;
+    __asm__ __volatile__("fnstcw %0" : "=m" (control_word));
+    log(INFO, "FPU Control Word before fninit: 0x%04x\n", control_word);
+    __asm__ __volatile__("fninit");
+    __asm__ __volatile__("fnstcw %0" : "=m" (control_word));
+    log(INFO, "FPU Control Word after fninit: 0x%04x\n", control_word);
+    // control_word = 0x37F;
+    // __asm__ __volatile__("fldcw %0" : : "m" (control_word));
+    // __asm__ __volatile__("fnstcw %0" : "=m" (control_word));
+    // log(INFO, "FPU Control Word after fldcw: 0x%04x\n", control_word);
+
     mem_init();
     time_init(arg);
     block_init(arg);

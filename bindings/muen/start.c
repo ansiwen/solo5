@@ -22,6 +22,71 @@
 #include "../crt_init.h"
 #include "solo5_version.h"
 
+// Function to read the XCR0 register
+unsigned long long read_xcr0() {
+    unsigned int eax, edx;
+    __asm__ __volatile__ (
+        "xgetbv"
+        : "=a" (eax), "=d" (edx)
+        : "c" (0)
+    );
+    return ((unsigned long long)edx << 32) | eax;
+}
+
+// Function to set the XCR0 register to enable AVX and SSE
+void set_xcr0_for_avx2() {
+    unsigned long long xcrFeatureMask = 0x6;
+    __asm__ __volatile__ (
+        "xsetbv"
+        :
+        : "c" (0), "a" ((unsigned int)xcrFeatureMask), "d" ((unsigned int)(xcrFeatureMask >> 32))
+    );
+}
+
+// Function to check if AVX2 is supported by the CPU
+int is_avx2_supported() {
+    int cpuInfo[4];
+    __asm__ __volatile__ (
+        "cpuid"
+        : "=a" (cpuInfo[0]), "=b" (cpuInfo[1]), "=c" (cpuInfo[2]), "=d" (cpuInfo[3])
+        : "a" (0)
+    );
+    int nIds = cpuInfo[0];
+
+    if (nIds >= 7) {
+        __asm__ __volatile__ (
+            "cpuid"
+            : "=a" (cpuInfo[0]), "=b" (cpuInfo[1]), "=c" (cpuInfo[2]), "=d" (cpuInfo[3])
+            : "a" (7), "c" (0)
+        );
+        return (cpuInfo[1] & (1 << 5)) != 0;
+    }
+
+    return 0;
+}
+
+// Function to enable AVX2 if supported
+void enable_avx2() {
+    // Read and print the original state of XCR0
+    unsigned long long originalXcr0 = read_xcr0();
+    log(INFO, "Original XCR0 state: 0x%llx\n", originalXcr0);
+
+    // Set XCR0 to enable AVX (bit 2) and SSE (bit 1)
+    set_xcr0_for_avx2();
+
+    // Read and print the new state of XCR0
+    unsigned long long newXcr0 = read_xcr0();
+    log(INFO, "New XCR0 state: 0x%llx\n", newXcr0);
+
+    // Check if AVX2 is supported after setting XCR0
+    if (!is_avx2_supported()) {
+        log(INFO, "AVX2 is not supported on this system.\n");
+    } else {
+        log(INFO, "AVX2 is enabled!\n");
+    }
+}
+
+
 void _start(void *arg)
 {
     crt_init_ssp();
@@ -31,6 +96,7 @@ void _start(void *arg)
 
     console_init();
     cpu_init();
+//    enable_avx2();
     platform_init(arg);
     si.cmdline = cmdline_parse(platform_cmdline());
 
@@ -46,10 +112,6 @@ void _start(void *arg)
     __asm__ __volatile__("fninit");
     __asm__ __volatile__("fnstcw %0" : "=m" (control_word));
     log(INFO, "FPU Control Word after fninit: 0x%04x\n", control_word);
-    // control_word = 0x37F;
-    // __asm__ __volatile__("fldcw %0" : : "m" (control_word));
-    // __asm__ __volatile__("fnstcw %0" : "=m" (control_word));
-    // log(INFO, "FPU Control Word after fldcw: 0x%04x\n", control_word);
 
     mem_init();
     time_init(arg);

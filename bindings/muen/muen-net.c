@@ -128,22 +128,23 @@ bool muen_net_pending_data(solo5_handle_t handle)
 
 static void generate_mac_addr(uint8_t *addr)
 {
-    const uint64_t dsize = sizeof(uint64_t) * 8;
     const char *subject_name = muen_get_subject_name();
-    static uint64_t counter = 0;
-    uint64_t data;
-    int i;
+    size_t subject_name_len = strlen(subject_name);
+    static uint8_t counter = 1;
 
-    data  = (muen_get_sched_start() << 32) | muen_get_sched_end();
-    data ^= tscclock_epochoffset();
-    data  = ((data << counter) | (data >> (dsize - counter))) + counter;
-    counter = (counter + 1) % dsize;
-
-    for (i = 0; i < 6; i++)
+    uint8_t sum = 0;
+    for (size_t i = 0; i < subject_name_len; i++)
     {
-        addr[i]  = subject_name[i];
-        addr[i] ^= (uint8_t)(data >> (i * 8));
+        sum ^= subject_name[i];
     }
+
+    memset(addr, sum, 6);
+    for (size_t i = 0; i < subject_name_len; i++)
+    {
+        addr[i%6] ^= subject_name[i];
+    }
+    addr[5] &= 0xf0;
+    addr[5] += counter++;
 
     /* clear multicast and set local assignment bit */
     addr[0] &= 0xfe;

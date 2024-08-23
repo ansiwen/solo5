@@ -22,6 +22,7 @@
 #include "sinfo.h"
 #include "reader.h"
 #include "writer.h"
+#include <stdint.h>
 
 #define PACKET_SIZE   1514
 #define MUENNET_PROTO 0x7ade5c549b08e814ULL
@@ -128,22 +129,18 @@ bool muen_net_pending_data(solo5_handle_t handle)
 
 static void generate_mac_addr(uint8_t *addr)
 {
-    const char *subject_name = muen_get_subject_name();
-    size_t subject_name_len = strlen(subject_name);
     static uint8_t counter = 1;
+    const char *subject_name = muen_get_subject_name();
 
-    uint8_t sum = 0;
-    for (size_t i = 0; i < subject_name_len; i++)
-    {
-        sum ^= subject_name[i];
+    uint64_t data = 0xdeadbeef41c6ce57;
+    for(int i = 0; subject_name[i]; i++) {
+        data = (data ^ subject_name[i]) * 0x85ebca77c2b2ae3d;
     }
-
-    memset(addr, sum, 6);
-    for (size_t i = 0; i < subject_name_len; i++)
+    data = data%0xfffffffffff << 4;
+    for (size_t i = 0; i < 6; i++)
     {
-        addr[i%6] ^= subject_name[i];
+        addr[i] = (uint8_t)(data >> ((5-i) * 8));
     }
-    addr[5] &= 0xf0;
     addr[5] += counter++;
 
     /* clear multicast and set local assignment bit */
